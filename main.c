@@ -39,6 +39,10 @@
 /* USER CODE BEGIN PD */
 #define RxBufferSize 100
 #define MAX_ANGLE_LENGTH 4  // Adjust if needed (4 digits + comma)
+
+#define PUMP_PIN GPIO_PIN_1
+#define PUMP_GPIO GPIOB
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -55,7 +59,7 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
-
+uint8_t pump =0;
 uint8_t RxData[RxBufferSize];
 char send[100];
 int ReadyToSend = 1;
@@ -95,18 +99,17 @@ static void MX_USART1_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 	// Ensure we're using UART1
 	if (huart->Instance == USART1) {
 		RxData[Size] = '\0';  // Null-terminate received data
 		char *token;
-		int servo_angles[5] = { 0 };  // Initialize angles array to zero
+		int servo_angles[6] = { 0 };  // Initialize angles array to zero
 		int index = 0;
 
 		// Parse RxData for comma-separated values
-		token = strtok((char*)RxData, ",");
-		while (token != NULL && index < 5) {  // Parse up to 5 angles
+		token = strtok((char*) RxData, ",");
+		while (token != NULL && index < 6) {  // Parse up to 5 angles
 			servo_angles[index] = atoi(token); // Convert angle string to integer
 			if (servo_angles[index] > 180) {
 				servo_angles[index] = 180;     // Cap angle to max 180
@@ -120,23 +123,18 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 			Base.SetAngle = servo_angles[0];
 		if (index > 1)
 			Shoulder.SetAngle = servo_angles[1];
-		if (index >2)
+		if (index > 2)
 			Elbow.SetAngle = servo_angles[2];
 		if (index > 3)
 			Wrist1.SetAngle = servo_angles[3];
-		if (index >4)
+		if (index > 4)
 			Wrist2.SetAngle = servo_angles[4];
-
-		// Calculate steps to reach SetAngles
-		Base.Step = (float) (Base.Angle - Base.SetAngle) / 180.0;
-		Shoulder.Step = (float) (Shoulder.Angle - Shoulder.SetAngle) / 180.0;
-		Elbow.Step = (float) (Elbow.Angle - Elbow.SetAngle) / 180.0;
-		Wrist1.Step = (float) (Wrist1.Angle - Wrist1.SetAngle) / 180.0;
-		Wrist2.Step = (float) (Wrist2.Angle - Wrist2.SetAngle) / 180.0;
+		if (index > 5)
+			pump = servo_angles[5];
 
 		// Send confirmation message with received angles
-		sprintf(send, "Base %d,Shoulder %d, Elbow %d,Wrist1 %d,Wrist2 %d\n",Base.SetAngle, Shoulder.SetAngle, Elbow.SetAngle,Wrist1.SetAngle, Wrist2.SetAngle);
-		HAL_UART_Transmit_IT(&huart1, (uint8_t*) send, strlen(send));
+//		sprintf(send, "Base %d,Shoulder %d, Elbow %d,Wrist1 %d,Wrist2 %d\n",Base.SetAngle, Shoulder.SetAngle, Elbow.SetAngle,Wrist1.SetAngle, Wrist2.SetAngle);
+//		HAL_UART_Transmit_IT(&huart1, (uint8_t*) send, strlen(send));
 
 		// Clear RxData buffer for the next command
 		memset(RxData, 0, RxBufferSize);
@@ -244,51 +242,83 @@ int main(void)
 		CurrentMillis = HAL_GetTick();
 
 		if (Base.Angle != Base.SetAngle) {
-
-			SetServoAngle(&htim4, TIM_CHANNEL_4, Base.SetAngle);
-			Base.Angle = Base.SetAngle;
-			HAL_Delay(5);
+			if (Base.SetAngle > Base.Angle) {
+				Base.Angle += 1;
+			} else {
+				Base.Angle -= 1;
+			}
+			SetServoAngle(&htim4, TIM_CHANNEL_4, Base.Angle);
+			HAL_Delay(2);
 		}
+		//HAL_Delay(2);
 
 		if (Shoulder.Angle != Shoulder.SetAngle) {
-
-			SetServoAngle(&htim4, TIM_CHANNEL_3, Shoulder.SetAngle);
-			Shoulder.Angle = Shoulder.SetAngle;
-			HAL_Delay(5);
+			if (Shoulder.SetAngle > Shoulder.Angle) {
+				Shoulder.Angle += 1;
+			} else {
+				Shoulder.Angle -= 1;
+			}
+			SetServoAngle(&htim4, TIM_CHANNEL_3, Shoulder.Angle);
+			HAL_Delay(2);
 		}
+		//
+
 
 		if (Elbow.Angle != Elbow.SetAngle) {
+			if (Elbow.SetAngle > Elbow.Angle) {
+				Elbow.Angle += 1;
+			} else {
+				Elbow.Angle -= 1;
+			}
+			SetServoAngle(&htim4, TIM_CHANNEL_2, Elbow.Angle);
+			HAL_Delay(2);
+			}
+		//HAL_Delay(2);
 
-			SetServoAngle(&htim4, TIM_CHANNEL_2, Elbow.SetAngle);
-			Elbow.Angle = Elbow.SetAngle;
-			HAL_Delay(5);
-		}
+
 		if (Wrist1.Angle != Wrist1.SetAngle) {
-
-			SetServoAngle(&htim4, TIM_CHANNEL_1, Wrist1.SetAngle);
-			Wrist1.Angle = Wrist1.SetAngle;
-			HAL_Delay(5);
+			if (Wrist1.SetAngle > Wrist1.Angle) {
+				Wrist1.Angle += 1;
+			} else {
+				Wrist1.Angle -= 1;
+			}
+			SetServoAngle(&htim4, TIM_CHANNEL_1, Wrist1.Angle);
+			HAL_Delay(2);
 		}
+		//HAL_Delay(2);
+
+
 		if (Wrist2.Angle != Wrist2.SetAngle) {
-
-			SetServoAngle(&htim3, TIM_CHANNEL_2, Wrist2.SetAngle);
-			Wrist2.Angle = Wrist2.SetAngle;
-
-			HAL_Delay(5);
+			if (Wrist2.SetAngle > Wrist2.Angle) {
+				Wrist2.Angle += 1;
+			} else {
+				Wrist2.Angle -= 1;
+			}
+			SetServoAngle(&htim3, TIM_CHANNEL_2, Wrist2.Angle);
+			HAL_Delay(2);
 		}
+		//HAL_Delay(2);
 
-//		if ((CurrentMillis - PreviousMillis) >= 16 && ReadyToSend == 1) {
-//
-//			sprintf(send, "Base %d,Should %d, Elbow %d,W1 %d,C %d \n", Base.Angle, Shoulder.Angle,Elbow.Angle, Wrist1.Angle, Wrist2.Angle);
-//			HAL_UART_Transmit_IT(&huart1, (uint8_t*) send, strlen(send));
-//			ReadyToSend = 0;
-//			PreviousMillis = CurrentMillis;
-//		}
+
+		if ((CurrentMillis - PreviousMillis) >= 16 && ReadyToSend == 1) {
+
+			sprintf(send, "Base %d,Shld %d, Elb %d,Wrst1 %d,Wrst2 %d \n",Base.Angle, Shoulder.Angle, Elbow.Angle, Wrist1.Angle,Wrist2.Angle);
+			HAL_UART_Transmit_IT(&huart1, (uint8_t*) send, strlen(send));
+			ReadyToSend = 0;
+			PreviousMillis = CurrentMillis;
+		}
 
 		if ((CurrentMillis - PreviousMillis_LED) >= 1000) {
 			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
 			PreviousMillis_LED = CurrentMillis;
+		}
+
+
+		if(pump==1){
+			HAL_GPIO_WritePin(PUMP_GPIO, PUMP_PIN, 1);
+		}else {
+			HAL_GPIO_WritePin(PUMP_GPIO, PUMP_PIN, 0);
 		}
 
     /* USER CODE END WHILE */
@@ -600,11 +630,14 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -612,6 +645,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
